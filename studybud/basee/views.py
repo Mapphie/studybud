@@ -3,12 +3,14 @@ from django.http import HttpResponse
 from django.db.models import Q
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.forms import UserCreationForm
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from .models import Room, Topic
 from .forms import RoomForm
 
 def loginPage(request):
+    page = 'login'
     if request.user.is_authenticated:
         return redirect('home')
 
@@ -29,12 +31,29 @@ def loginPage(request):
         else:
             messages.error(request, 'Username OR password does not exist')
 
-    context = {}
+    context = {'page': page}
     return render(request, 'basee/login_register.html', context)
 
 def logoutUser(request):
     logout(request)
     return redirect('login')
+
+def registerPage(request):
+    form = UserCreationForm()
+
+    if request.method == 'POST':
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.username = user.username.lower()
+            user.save()
+            login(request, user)
+            return redirect('home')
+        else:
+            messages.error(request, 'An error occured during registration')
+
+    return render(request, 'basee/login_register.html', {'form': form})
+
 
 def home(request):
     action = request.GET.get('action') if request.GET.get('action') != None else ''
