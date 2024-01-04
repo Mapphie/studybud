@@ -1,3 +1,7 @@
+import subprocess
+import time
+import schedule
+import requests
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.db.models import Q
@@ -8,6 +12,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from .models import Room, Topic, Message
 from .forms import RoomForm
+
+# -------------------- LOGS ---------------------
 
 def loginPage(request):
     page = 'login'
@@ -64,10 +70,11 @@ def home(request):
     
     topics = Topic.objects.all()
     room_count = rooms.count()
-    
-    context = {'rooms': rooms, 'topics': topics, 'room_count': room_count}
+    room_messages = Message.objects.filter(Q(room__topic__name__icontains=action))
+    context = {'rooms': rooms, 'topics': topics, 'room_count': room_count, 'room_messages': room_messages}
     return render(request, 'basee/home.html', context)
 
+# ------------- ROOM ---------------------------
 def room(request, pk):
     room = Room.objects.get(id = pk)
     room_messages = room.message_set.all().order_by('-created')
@@ -92,11 +99,13 @@ def createRoom(request):
     if request.method == 'POST':
         form = RoomForm(request.POST)
         if form.is_valid():
-            form.save()
+            room = form.save(commit=False)
+            room.host = request.user
+            room.save()
             return redirect('home')
     
     context = {'form': form}
-    return render(request, 'basee/room_form.html',context)
+    return render(request, 'basee/create-room.html',context)
 
 @login_required(login_url ='login' )
 def updateRoom(request, pk):
@@ -128,6 +137,7 @@ def deleteRoom(request,pk):
         return redirect('home')
     return render(request, 'basee/delete.html', {'obj': room})
 
+# -------------------------MESSAGES----------------------
 @login_required(login_url ='login' )
 def deleteMessage(request,pk):
     message = Message.objects.get(id=pk)
@@ -140,6 +150,36 @@ def deleteMessage(request,pk):
         return redirect('home')
     return render(request, 'basee/delete.html', {'obj': message})
 
+def api(request):
+    chemin_api_js = r"..\studybud\api.js"
+    commande = ["node", chemin_api_js]
+    processus_api = subprocess.Popen(commande, shell=True)
+
+    time.sleep(5)
+
+    api_url = "http://localhost:3000/api/hello"
+    response = requests.get(api_url)
+
+    if response.status_code == 200:
+        print(response.json())
+        return redirect('login')
+    else:
+        print(f"Erreur de requête: {response.status_code}")
+
+    processus_api.terminate()
+    
+# --------------------------- USERS ------------------------
+
+def profile(request,pk):
+    user = User.objects.get(pk=pk)
+    rooms = user.room_set.all()
+    room_messages = user.message_set.all()
+    topics = Topic.objects.all()
+    context = {'user':user, 'rooms':rooms, 'room_messages':room_messages, 'topics': topics}
+    return render(request, 'basee/profile.html', context)
+    
+
+    
 
 
 
